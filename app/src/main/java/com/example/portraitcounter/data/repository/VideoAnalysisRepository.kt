@@ -1,8 +1,11 @@
 package com.example.portraitcounter.data.repository
 
 import android.net.Uri
+import android.util.Log
 import com.example.portraitcounter.data.ml.AppearanceTracker
+import com.example.portraitcounter.data.ml.CosineSimilarity
 import com.example.portraitcounter.data.ml.FaceDetector
+import com.example.portraitcounter.data.ml.FaceEmbedder
 import com.example.portraitcounter.data.video.VideoFrameExtractor
 import com.example.portraitcounter.domain.model.ProcessingState
 import kotlinx.coroutines.Dispatchers
@@ -10,7 +13,8 @@ import kotlinx.coroutines.withContext
 
 class VideoAnalysisRepository(
     private val frameExtractor: VideoFrameExtractor,
-    private val faceDetector: FaceDetector
+    private val faceDetector: FaceDetector,
+    private val faceEmbedder: FaceEmbedder
 ) {
 
     suspend fun analyzeVideo(
@@ -34,8 +38,14 @@ class VideoAnalysisRepository(
                 val appearanceTracker = AppearanceTracker()
 
                 var facesDetected = 0
+                var embeddingTested = false
 
-                frames.forEachIndexed { index, (timestampMs, bitmap) ->
+                var firstEmbedding: FloatArray? = null
+
+                frames.forEachIndexed { index, frame ->
+
+                    val timestampMs = frame.first
+                    val bitmap = frame.second
 
                     val faces = faceDetector.detectFaces(
                         bitmap = bitmap,
@@ -44,8 +54,45 @@ class VideoAnalysisRepository(
 
                     facesDetected += faces.size
 
-                    // Give this frame's detections to the appearance tracker.
                     appearanceTracker.processFrame(faces)
+
+                    if (faces.isNotEmpty()) {
+
+                        val embedding = faceEmbedder.embed(
+                            bitmap = bitmap,
+                            boundingBox = faces.first().boundingBox
+                        )
+
+                        if (!embeddingTested) {
+
+                            firstEmbedding = embedding
+                            embeddingTested = true
+
+                            Log.d(
+                                "FaceSimilarity",
+                                "First embedding generated: ${embedding.size} dimensions"
+                            )
+
+                        } else if (firstEmbedding != null) {
+
+                            val similarity = CosineSimilarity.calculate(
+                                first = firstEmbedding!!,
+                                second = embedding
+                            )
+
+                            Log.d(
+                                "FaceSimilarity",
+                                "Frame $index | " +
+                                        "timestamp=${timestampMs}ms | " +
+                                        "similarity=$similarity"
+                            )
+
+                            // We only need a few comparisons for now.
+                            if (index >= 10) {
+                                firstEmbedding = null
+                            }
+                        }
+                    }
 
                     onProgress(
                         ProcessingState.Processing(
@@ -58,8 +105,6 @@ class VideoAnalysisRepository(
                     bitmap.recycle()
                 }
 
-                // Finish any appearances that were still active
-                // when the video ended.
                 val appearances = appearanceTracker.finish()
 
                 ProcessingState.Success(
@@ -69,6 +114,12 @@ class VideoAnalysisRepository(
                 )
 
             } catch (exception: Exception) {
+
+                Log.e(
+                    "VideoAnalysis",
+                    "Video analysis failed",
+                    exception
+                )
 
                 ProcessingState.Error(
                     exception.message
@@ -80,6 +131,7 @@ class VideoAnalysisRepository(
 
     fun close() {
         faceDetector.close()
+        faceEmbedder.close()
     }
 }
 

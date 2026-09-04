@@ -1,6 +1,7 @@
 package com.example.portraitcounter.presentation.viewmodel
 
 import android.app.Application
+import com.example.portraitcounter.data.ml.FaceEmbedder
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,7 +20,8 @@ class VideoAnalysisViewModel(
 
     private val repository = VideoAnalysisRepository(
         frameExtractor = VideoFrameExtractor(application),
-        faceDetector = FaceDetector()
+        faceDetector = FaceDetector(),
+        faceEmbedder = FaceEmbedder(application)
     )
 
     private val _processingState =
