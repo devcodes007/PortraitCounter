@@ -13,7 +13,9 @@ sealed interface ProcessingState {
     data class Success(
         val framesProcessed: Int,
         val facesDetected: Int,
-        val appearances: List<Appearance>
+        val appearances: List<Appearance>,
+        val appearanceEmbeddings: List<AppearanceEmbedding>,
+        val personClusters: List<PersonCluster>
     ) : ProcessingState
 
     data class Error(

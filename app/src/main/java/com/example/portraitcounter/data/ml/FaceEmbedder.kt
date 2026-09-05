@@ -42,13 +42,14 @@ class FaceEmbedder(
             bitmap = bitmap,
             boundingBox = boundingBox
         )
-
         val resizedBitmap = Bitmap.createScaledBitmap(
             faceBitmap,
             INPUT_SIZE,
             INPUT_SIZE,
             true
         )
+
+        faceBitmap.recycle()
 
         val inputBuffer = ByteBuffer
             .allocateDirect(INPUT_SIZE * INPUT_SIZE * 3 * 4)
@@ -76,6 +77,7 @@ class FaceEmbedder(
                 )
             }
         }
+        resizedBitmap.recycle()
 
         inputBuffer.rewind()
 
@@ -96,35 +98,61 @@ class FaceEmbedder(
         boundingBox: Rect
     ): Bitmap {
 
-        val paddingX = (boundingBox.width() * 0.25f).toInt()
-        val paddingY = (boundingBox.height() * 0.35f).toInt()
+        // Make the crop square so that the face is not
+        // distorted when resized to 112 x 112.
+        val faceWidth = boundingBox.width()
+        val faceHeight = boundingBox.height()
 
-        val left = maxOf(
-            0,
-            boundingBox.left - paddingX
-        )
+        val cropSize = (
+                maxOf(faceWidth, faceHeight) * 1.6f
+                ).toInt()
 
-        val top = maxOf(
-            0,
-            boundingBox.top - paddingY
-        )
+        val centerX = boundingBox.centerX()
+        val centerY = boundingBox.centerY()
 
-        val right = minOf(
-            bitmap.width,
-            boundingBox.right + paddingX
-        )
+        var left = centerX - cropSize / 2
+        var top = centerY - cropSize / 2
 
-        val bottom = minOf(
-            bitmap.height,
-            boundingBox.bottom + paddingY
-        )
+        var right = left + cropSize
+        var bottom = top + cropSize
+
+        // Shift the square back inside the bitmap.
+        if (left < 0) {
+            right -= left
+            left = 0
+        }
+
+        if (top < 0) {
+            bottom -= top
+            top = 0
+        }
+
+        if (right > bitmap.width) {
+            left -= right - bitmap.width
+            right = bitmap.width
+        }
+
+        if (bottom > bitmap.height) {
+            top -= bottom - bitmap.height
+            bottom = bitmap.height
+        }
+
+        left = left.coerceAtLeast(0)
+        top = top.coerceAtLeast(0)
+        right = right.coerceAtMost(bitmap.width)
+        bottom = bottom.coerceAtMost(bitmap.height)
+
+        val width = right - left
+        val height = bottom - top
+
+        val finalSize = minOf(width, height)
 
         return Bitmap.createBitmap(
             bitmap,
             left,
             top,
-            right - left,
-            bottom - top
+            finalSize,
+            finalSize
         )
     }
 

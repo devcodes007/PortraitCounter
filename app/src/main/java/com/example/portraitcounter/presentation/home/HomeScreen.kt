@@ -52,6 +52,10 @@ fun HomeScreen(
                     text = "Appearances detected: ${processingState.appearances.size}",
                     modifier = Modifier.padding(top = 8.dp)
                 )
+                Text(
+                    text = "Unique people: ${processingState.personClusters.size}",
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
         }
 

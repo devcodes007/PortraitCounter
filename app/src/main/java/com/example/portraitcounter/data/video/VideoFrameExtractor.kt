@@ -49,4 +49,21 @@ class VideoFrameExtractor(
             retriever.release()
         }
     }
+    fun extractFrameAt(
+        videoUri: Uri,
+        timestampMs: Long
+    ): Bitmap? {
+        val retriever = MediaMetadataRetriever()
+
+        return try {
+            retriever.setDataSource(context, videoUri)
+
+            retriever.getFrameAtTime(
+                timestampMs * 1000,
+                MediaMetadataRetriever.OPTION_CLOSEST
+            )
+        } finally {
+            retriever.release()
+        }
+    }
 }
